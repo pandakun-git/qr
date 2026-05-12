@@ -4,16 +4,15 @@ Private Sub Worksheet_Change(ByVal Target As Range)
 
     On Error GoTo SafeExit
 
-    If Intersect(Target, Me.Range("B5")) Is Nothing Then Exit Sub
-    If Target.CountLarge > 1 Then Exit Sub
+    If Intersect(Target, Me.Range("C13")) Is Nothing Then Exit Sub
 
     Dim qr As String
-    qr = CStr(Me.Range("B5").Value)
+    qr = CStr(Me.Range("C13").Value)
 
     If Trim(qr) = "" Then Exit Sub
 
     Application.EnableEvents = False
-    Me.Range("B5").ClearContents
+    Me.Range("C13").MergeArea.ClearContents
     Application.EnableEvents = True
 
     QR_Process qr
@@ -28,6 +27,7 @@ End Sub
 
 Private Sub Worksheet_Activate()
 
+    QR_ApplyScreenProtection
     QR_FocusInput
 
 End Sub
