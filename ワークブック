@@ -1,0 +1,10 @@
+Option Explicit
+
+Private Sub Workbook_Open()
+
+    ThisWorkbook.Worksheets("QR読込画面").Activate
+    QR_InitializeScreen
+    QR_ApplyScreenProtection
+    QR_FocusInput
+
+End Sub
