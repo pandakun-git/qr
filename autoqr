@@ -115,3 +115,67 @@ ErrHandler:
     MsgBox "QR作成シート作成でエラーが発生しました。" & vbCrLf & Err.Description, vbExclamation
 
 End Sub
+'==================================================
+' QR作成シートのQR値からQR画像を生成
+' Microsoft BarCode Control が使える環境向け
+'==================================================
+Public Sub QR_GenerateQRCodeImages()
+
+    On Error GoTo ErrHandler
+
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets("QR作成")
+
+    '既存QR画像削除
+    Dim obj As OLEObject
+    For Each obj In ws.OLEObjects
+        If Left(obj.Name, 6) = "QRIMG_" Then
+            obj.Delete
+        End If
+    Next obj
+
+    Dim lastRow As Long
+    lastRow = ws.Cells(ws.Rows.Count, "B").End(xlUp).Row
+
+    Dim r As Long
+    Dim qrValue As String
+    Dim ole As OLEObject
+
+    For r = 2 To lastRow
+
+        qrValue = Trim(CStr(ws.Cells(r, "B").Value))
+
+        If qrValue <> "" Then
+
+            Set ole = ws.OLEObjects.Add( _
+                ClassType:="BARCODE.BarCodeCtrl.1", _
+                Link:=False, _
+                DisplayAsIcon:=False, _
+                Left:=ws.Cells(r, "E").Left + 4, _
+                Top:=ws.Cells(r, "E").Top + 2, _
+                Width:=70, _
+                Height:=70)
+
+            ole.Name = "QRIMG_" & r
+
+            With ole.Object
+                .Style = 11
+                .Value = qrValue
+            End With
+
+            ws.Rows(r).RowHeight = 78
+
+        End If
+
+    Next r
+
+    MsgBox "QR画像を生成しました。", vbInformation
+    Exit Sub
+
+ErrHandler:
+    MsgBox "QR画像生成でエラーが発生しました。" & vbCrLf & _
+           "この環境では Microsoft BarCode Control が使えない可能性があります。" & vbCrLf & _
+           "まずはQR作成シートのQR値を使って、別手段でQR化してください。" & vbCrLf & vbCrLf & _
+           Err.Description, vbExclamation
+
+End Sub
