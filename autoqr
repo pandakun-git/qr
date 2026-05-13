@@ -1,0 +1,117 @@
+'==================================================
+' QR作成シートを作成・更新
+' 媒体、利用者、管理用QRを一覧化
+'==================================================
+Public Sub QR_BuildQRCodeSheet()
+
+    On Error GoTo ErrHandler
+
+    Dim ws As Worksheet
+
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("QR作成")
+    On Error GoTo ErrHandler
+
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+        ws.Name = "QR作成"
+    End If
+
+    ws.Cells.Clear
+
+    '見出し
+    ws.Range("A1").Value = "区分"
+    ws.Range("B1").Value = "QR値"
+    ws.Range("C1").Value = "表示名"
+    ws.Range("D1").Value = "補足"
+    ws.Range("E1").Value = "QR画像"
+
+    With ws.Range("A1:E1")
+        .Font.Bold = True
+        .Interior.Color = RGB(0, 97, 45)
+        .Font.Color = vbWhite
+        .HorizontalAlignment = xlCenter
+    End With
+
+    Dim outRow As Long
+    outRow = 2
+
+    '媒体マスタから作成
+    Dim loMedia As ListObject
+    Set loMedia = ThisWorkbook.Worksheets("媒体マスタ").ListObjects("tblMedia")
+
+    Dim cMediaQR As Long
+    Dim cRegister As Long
+    Dim cMediaType As Long
+
+    cMediaQR = loMedia.ListColumns("媒体QR").Index
+    cRegister = loMedia.ListColumns("登録番号").Index
+    cMediaType = loMedia.ListColumns("媒体種別").Index
+
+    Dim i As Long
+
+    If Not loMedia.DataBodyRange Is Nothing Then
+        For i = 1 To loMedia.DataBodyRange.Rows.Count
+            ws.Cells(outRow, "A").Value = "媒体"
+            ws.Cells(outRow, "B").Value = loMedia.DataBodyRange.Cells(i, cMediaQR).Value
+            ws.Cells(outRow, "C").Value = loMedia.DataBodyRange.Cells(i, cRegister).Value
+            ws.Cells(outRow, "D").Value = loMedia.DataBodyRange.Cells(i, cMediaType).Value
+            outRow = outRow + 1
+        Next i
+    End If
+
+    '利用者マスタから作成
+    Dim loUser As ListObject
+    Set loUser = ThisWorkbook.Worksheets("利用者マスタ").ListObjects("tblUser")
+
+    Dim cUserQR As Long
+    Dim cUserName As Long
+
+    cUserQR = loUser.ListColumns("利用者QR").Index
+    cUserName = loUser.ListColumns("使用者").Index
+
+    If Not loUser.DataBodyRange Is Nothing Then
+        For i = 1 To loUser.DataBodyRange.Rows.Count
+            ws.Cells(outRow, "A").Value = "利用者"
+            ws.Cells(outRow, "B").Value = loUser.DataBodyRange.Cells(i, cUserQR).Value
+            ws.Cells(outRow, "C").Value = loUser.DataBodyRange.Cells(i, cUserName).Value
+            ws.Cells(outRow, "D").Value = ""
+            outRow = outRow + 1
+        Next i
+    End If
+
+    '管理用QR
+    ws.Cells(outRow, "A").Value = "管理"
+    ws.Cells(outRow, "B").Value = "SYS:CANCEL"
+    ws.Cells(outRow, "C").Value = "取消"
+    ws.Cells(outRow, "D").Value = "読込途中の処理を取消"
+    outRow = outRow + 1
+
+    ws.Cells(outRow, "A").Value = "管理"
+    ws.Cells(outRow, "B").Value = "SYS:RESET"
+    ws.Cells(outRow, "C").Value = "リセット"
+    ws.Cells(outRow, "D").Value = "画面状態を初期化"
+    outRow = outRow + 1
+
+    '書式
+    ws.Columns("A").ColumnWidth = 12
+    ws.Columns("B").ColumnWidth = 20
+    ws.Columns("C").ColumnWidth = 20
+    ws.Columns("D").ColumnWidth = 28
+    ws.Columns("E").ColumnWidth = 18
+
+    ws.Rows("1:" & outRow).RowHeight = 24
+    ws.Range("A1:E" & outRow - 1).Borders.LineStyle = xlContinuous
+    ws.Range("A1:E" & outRow - 1).VerticalAlignment = xlCenter
+
+    ws.Range("B:B").NumberFormat = "@"
+
+    MsgBox "QR作成シートを作成しました。" & vbCrLf & _
+           "次にQR画像生成を実行してください。", vbInformation
+
+    Exit Sub
+
+ErrHandler:
+    MsgBox "QR作成シート作成でエラーが発生しました。" & vbCrLf & Err.Description, vbExclamation
+
+End Sub
