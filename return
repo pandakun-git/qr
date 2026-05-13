@@ -1,0 +1,83 @@
+'==================================================
+' 返納処理
+' 1分以内の貸出は記録しない
+'==================================================
+Private Sub ReturnMedia(ByVal mediaQR As String, ByVal registerNo As String, ByVal activeRowIndex As Long)
+
+    Dim lo As ListObject
+    Set lo = GetTable(SHEET_LOG, TBL_LOG)
+
+    Dim cOut As Long
+    Dim cIn As Long
+    Dim cUser As Long
+    Dim cNote As Long
+
+    cOut = GetColIndex(lo, "取出時間")
+    cIn = GetColIndex(lo, "格納時間")
+    cUser = GetColIndex(lo, "使用者")
+    cNote = GetColIndex(lo, "備考")
+
+    Dim inTime As Date
+    inTime = Now
+
+    Dim outValue As Variant
+    Dim userName As String
+
+    outValue = lo.DataBodyRange.Cells(activeRowIndex, cOut).Value
+    userName = CStr(lo.DataBodyRange.Cells(activeRowIndex, cUser).Value)
+
+    '------------------------------------------
+    ' 1分以内なら記録しない
+    '------------------------------------------
+    If IsDate(outValue) Then
+
+        Dim elapsedSeconds As Long
+        elapsedSeconds = DateDiff("s", CDate(outValue), inTime)
+
+        If elapsedSeconds <= 60 Then
+
+            lo.ListRows(activeRowIndex).Delete
+
+            SetScreenMessage "媒体QRを読み込んでください", _
+                             "返納完了：" & registerNo & " / " & userName & _
+                             "（1分以内のため記録しません）", _
+                             False
+
+            Exit Sub
+
+        End If
+
+    End If
+
+    '通常返納
+    lo.DataBodyRange.Cells(activeRowIndex, cIn).Value = inTime
+
+    Dim noteText As String
+    noteText = ""
+
+    If IsDate(outValue) Then
+        If DateValue(CDate(outValue)) <> DateValue(inTime) Then
+            noteText = Format(CDate(outValue), "yyyy/mm/dd") & "〜" & Format(inTime, "yyyy/mm/dd")
+        End If
+    End If
+
+    If noteText <> "" Then
+
+        Dim oldNote As String
+        oldNote = CStr(lo.DataBodyRange.Cells(activeRowIndex, cNote).Value)
+
+        If oldNote = "" Then
+            lo.DataBodyRange.Cells(activeRowIndex, cNote).Value = noteText
+        ElseIf InStr(oldNote, noteText) = 0 Then
+            lo.DataBodyRange.Cells(activeRowIndex, cNote).Value = oldNote & " / " & noteText
+        End If
+
+    End If
+
+    FormatLogColumns
+
+    SetScreenMessage "媒体QRを読み込んでください", _
+                     "返納完了：" & registerNo & " / " & userName, _
+                     False
+
+End Sub
