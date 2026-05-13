@@ -179,3 +179,229 @@ ErrHandler:
            Err.Description, vbExclamation
 
 End Sub
+'==================================================
+' 利用者QR一覧シートを作成
+' 画像のような一覧レイアウト版
+'==================================================
+Public Sub QR_BuildUserQRListSheet()
+
+    On Error GoTo ErrHandler
+
+    Dim ws As Worksheet
+    Dim lo As ListObject
+
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("利用者QR一覧")
+    On Error GoTo ErrHandler
+
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+        ws.Name = "利用者QR一覧"
+    End If
+
+    Set lo = GetTable(SHEET_USER, TBL_USER)
+
+    If lo.DataBodyRange Is Nothing Then
+        MsgBox "利用者マスタにデータがありません。", vbExclamation
+        Exit Sub
+    End If
+
+    Application.ScreenUpdating = False
+
+    '既存QR削除
+    Dim ole As OLEObject
+    For Each ole In ws.OLEObjects
+        ole.Delete
+    Next ole
+
+    ws.Cells.UnMerge
+    ws.Cells.Clear
+    ws.Cells.Font.Name = "MS P明朝"
+    ws.Cells.Font.Size = 10
+
+    '-----------------------------------
+    ' レイアウト設定
+    '-----------------------------------
+    Const START_ROW As Long = 2
+    Const START_COL As Long = 3      ' C列開始
+    Const CARDS_PER_ROW As Long = 10 ' 1行10人
+    Const CARD_HEIGHT As Long = 3    ' 1人あたり3行使用
+    Const SIDE_COL As Long = 2       ' B列に黄色帯
+
+    Dim lastUserRowBlock As Long
+    Dim totalUsers As Long
+    totalUsers = lo.DataBodyRange.Rows.Count
+
+    Dim totalBlocks As Long
+    totalBlocks = (totalUsers - 1) \ CARDS_PER_ROW + 1
+
+    lastUserRowBlock = START_ROW + totalBlocks * CARD_HEIGHT - 1
+
+    '-----------------------------------
+    ' シート全体の見た目
+    '-----------------------------------
+    ws.Columns("A").ColumnWidth = 2
+    ws.Columns("B").ColumnWidth = 5
+
+    Dim c As Long
+    For c = START_COL To START_COL + CARDS_PER_ROW - 1
+        ws.Columns(c).ColumnWidth = 12
+    Next c
+
+    ws.Rows.RowHeight = 18
+
+    Dim r As Long
+    For r = START_ROW To lastUserRowBlock Step CARD_HEIGHT
+        ws.Rows(r).RowHeight = 18      '名前行
+        ws.Rows(r + 1).RowHeight = 42  'QR上段
+        ws.Rows(r + 2).RowHeight = 42  'QR下段
+    Next r
+
+    '-----------------------------------
+    ' 左の黄色帯
+    '-----------------------------------
+    With ws.Range(ws.Cells(START_ROW, SIDE_COL), ws.Cells(lastUserRowBlock, SIDE_COL))
+        .Merge
+        .Value = "利" & vbLf & "用" & vbLf & "者" & vbLf & "Ｑ" & vbLf & "Ｒ"
+        .Interior.Color = RGB(255, 230, 80)
+        .Font.Bold = True
+        .Font.Size = 18
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Borders.LineStyle = xlContinuous
+        .Borders.Color = RGB(80, 80, 80)
+    End With
+
+    '-----------------------------------
+    ' 利用者データを配置
+    '-----------------------------------
+    Dim cQR As Long
+    Dim cName As Long
+    cQR = GetColIndex(lo, "利用者QR")
+    cName = GetColIndex(lo, "使用者")
+
+    Dim i As Long
+    Dim userQR As String
+    Dim userName As String
+    Dim userNo As String
+
+    Dim blockRow As Long
+    Dim blockCol As Long
+    Dim cellRow As Long
+    Dim cellCol As Long
+
+    For i = 1 To totalUsers
+
+        userQR = CStr(lo.DataBodyRange.Cells(i, cQR).Value)
+        userName = CStr(lo.DataBodyRange.Cells(i, cName).Value)
+        userNo = ExtractUserNumber(userQR)
+
+        blockRow = (i - 1) \ CARDS_PER_ROW
+        blockCol = (i - 1) Mod CARDS_PER_ROW
+
+        cellRow = START_ROW + blockRow * CARD_HEIGHT
+        cellCol = START_COL + blockCol
+
+        'カード全体の枠
+        With ws.Range(ws.Cells(cellRow, cellCol), ws.Cells(cellRow + 2, cellCol))
+            .Borders.LineStyle = xlContinuous
+            .Borders.Color = RGB(80, 80, 80)
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+        End With
+
+        '名前＋番号
+        With ws.Cells(cellRow, cellCol)
+            .Value = userName & "  " & userNo
+            .Font.Bold = True
+            .Font.Size = 9
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+            .WrapText = True
+        End With
+
+        'QRエリア
+        With ws.Range(ws.Cells(cellRow + 1, cellCol), ws.Cells(cellRow + 2, cellCol))
+            .Merge
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+        End With
+
+        'QR貼付
+        Call PutQRCodeOnRange(ws, ws.Range(ws.Cells(cellRow + 1, cellCol), ws.Cells(cellRow + 2, cellCol)), userQR, "USRQR_" & Format(i, "000"))
+
+    Next i
+
+    '-----------------------------------
+    ' 印刷設定
+    '-----------------------------------
+    With ws.PageSetup
+        .Orientation = xlLandscape
+        .PaperSize = xlPaperA4
+        .Zoom = False
+        .FitToPagesWide = 1
+        .FitToPagesTall = False
+        .LeftMargin = Application.CentimetersToPoints(0.5)
+        .RightMargin = Application.CentimetersToPoints(0.5)
+        .TopMargin = Application.CentimetersToPoints(0.5)
+        .BottomMargin = Application.CentimetersToPoints(0.5)
+        .CenterHorizontally = True
+        .CenterVertically = False
+        .PrintGridlines = False
+        .PrintArea = ws.Range(ws.Cells(1, 1), ws.Cells(lastUserRowBlock, START_COL + CARDS_PER_ROW - 1)).Address
+    End With
+
+    ws.Activate
+
+    Application.ScreenUpdating = True
+
+    MsgBox "利用者QR一覧シートを作成しました。", vbInformation
+    Exit Sub
+
+ErrHandler:
+    Application.ScreenUpdating = True
+    MsgBox "利用者QR一覧作成でエラーが発生しました。" & vbCrLf & Err.Description, vbExclamation
+
+End Sub
+'==================================================
+' 指定範囲の中央にQRコードを配置
+'==================================================
+Private Sub PutQRCodeOnRange(ByVal ws As Worksheet, ByVal targetRange As Range, ByVal qrValue As String, ByVal objName As String)
+
+    Dim qrSize As Double
+    qrSize = 48
+
+    Dim ole As OLEObject
+    Set ole = ws.OLEObjects.Add( _
+        ClassType:="BARCODE.BarCodeCtrl.1", _
+        Link:=False, _
+        DisplayAsIcon:=False, _
+        Left:=targetRange.Left + (targetRange.Width - qrSize) / 2, _
+        Top:=targetRange.Top + (targetRange.Height - qrSize) / 2, _
+        Width:=qrSize, _
+        Height:=qrSize)
+
+    ole.Name = objName
+
+    With ole.Object
+        .Style = 11
+        .Value = qrValue
+    End With
+
+End Sub
+'==================================================
+' 利用者QRから番号を取り出す
+' 例：USER:1234 → 1234
+'==================================================
+Private Function ExtractUserNumber(ByVal userQR As String) As String
+
+    Dim s As String
+    s = NormalizeQR(userQR)
+
+    If Left(s, 5) = "USER:" Then
+        ExtractUserNumber = Mid(s, 6)
+    Else
+        ExtractUserNumber = s
+    End If
+
+End Function
